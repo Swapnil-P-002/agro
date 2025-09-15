@@ -1,0 +1,250 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Farmer App - Login & Registration</title>
+<style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background: linear-gradient(-45deg, #6a11cb, #2575fc, #ff6a00, #00c853);
+    background-size: 400% 400%;
+    animation: gradientBG 12s ease infinite;
+    transition: background 0.5s;
+  }
+  @keyframes gradientBG {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+  body.dark {
+    animation: darkGradient 15s ease infinite;
+  }
+  @keyframes darkGradient {
+    0% { background-position: 0% 50%; background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364); }
+    50% { background-position: 100% 50%; background: linear-gradient(-45deg, #2c3e50, #34495e, #4b6584); }
+    100% { background-position: 0% 50%; background: linear-gradient(-45deg, #0f2027, #203a43, #2c5364); }
+  }
+  .container {
+    width: 400px;
+    padding: 30px;
+    border-radius: 20px;
+    backdrop-filter: blur(15px);
+    background: rgba(255, 255, 255, 0.15);
+    box-shadow: 0px 8px 32px rgba(0,0,0,0.25);
+    color: #fff;
+    position: relative;
+    overflow: hidden;
+  }
+  body.dark .container { background: rgba(0,0,0,0.6); color: #eee; }
+  h2 { margin-bottom: 20px; font-weight: 600; letter-spacing: 1px; text-align:center; }
+  .top-bar { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 14px; align-items: center; }
+  .datetime { font-size: 13px; font-weight: bold; }
+  .language-select, .mode-toggle { padding: 6px; border-radius: 8px; border: none; cursor: pointer; margin-left: 5px; }
+  .input-field { width: 100%; padding: 12px; margin: 10px 0; border: none; border-radius: 12px; outline: none; background: rgba(255,255,255,0.2); color: #fff; font-size: 15px; transition: 0.3s; }
+  .input-field::placeholder { color: rgba(255,255,255,0.7); }
+  .input-field:focus { background: rgba(255,255,255,0.3); box-shadow: 0px 0px 8px #00c853; }
+  body.dark .input-field { background: rgba(255,255,255,0.1); color: #fff; }
+  .btn { width: 100%; padding: 12px; margin-top: 12px; border: none; border-radius: 12px; cursor: pointer; font-size: 16px; font-weight: bold; background: linear-gradient(45deg, #00c853, #b2ff59); color: #000; transition: transform 0.2s, box-shadow 0.3s; }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0px 6px 15px rgba(0,0,0,0.4); }
+  body.dark .btn { background: linear-gradient(45deg, #ff6a00, #ffcc80); color: #000; }
+  .toggle-link { display: block; margin-top: 15px; cursor: pointer; font-size: 14px; color:#ffeb3b; transition: 0.3s; text-align:center; }
+  .toggle-link:hover { color: #fff176; }
+  body.dark .toggle-link { color: #80d8ff; }
+  .password-container { position: relative; }
+  .eye { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); cursor: pointer; font-size: 18px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="top-bar">
+    <div class="datetime" id="datetime"></div>
+    <div>
+      <select class="language-select" id="language" onchange="setLanguage()">
+        <option value="en">English</option>
+        <option value="mr">Marathi</option>
+        <option value="hi">Hindi</option>
+        <option value="pa">Punjabi</option>
+      </select>
+      <button class="mode-toggle" onclick="toggleMode()">🌙</button>
+    </div>
+  </div>
+
+  <!-- Login Form -->
+  <div id="loginForm">
+    <h2 id="loginTitle">Login</h2>
+    <input type="text" id="loginName" placeholder="Full Name" class="input-field">
+    <div class="password-container">
+      <input type="password" placeholder="Password" id="loginPassword" class="input-field">
+      <!--<span class="eye" onclick="togglePassword('loginPassword')">👁️</span>-->
+    </div>
+    <button class="btn" id="loginBtn" onclick="login()">Login</button>
+    <span class="toggle-link" onclick="forgotPassword()">Forgot Password?</span>
+    <span class="toggle-link" id="goRegister" onclick="switchForm('register')">New User? Register Here</span>
+  </div>
+
+  <!-- Registration Form -->
+  <div id="registerForm" style="display:none;">
+    <h2 id="registerTitle">Register</h2>
+    <input type="text" id="regName" placeholder="Full Name" class="input-field">
+    <input type="text" id="regMobile" placeholder="Mobile Number" class="input-field">
+    <input type="email" id="regEmail" placeholder="Email" class="input-field">
+    <input list="stateList" id="regState" placeholder="State" class="input-field">
+    <datalist id="stateList"></datalist>
+    <input list="cityList" id="regCity" placeholder="City" class="input-field">
+    <datalist id="cityList"></datalist>
+    <input list="villageList" id="regVillage" placeholder="Village" class="input-field">
+    <datalist id="villageList"></datalist>
+    <div class="password-container">
+      <input type="password" placeholder="Password" id="registerPassword" class="input-field">
+      <span class="eye" onclick="togglePassword('registerPassword')">👁️</span>
+    </div>
+    <button class="btn" id="registerBtn" onclick="registerUser()">Register</button>
+    <span class="toggle-link" id="goLogin" onclick="switchForm('login')">Already have an account? Login Here</span>
+  </div>
+</div>
+
+<script>
+const translations = {
+  en: {loginTitle:"Login",loginName:"Full Name",loginPassword:"Password",loginBtn:"Login",goRegister:"New User? Register Here",
+       registerTitle:"Register",regName:"Full Name",regMobile:"Mobile Number",regEmail:"Email",regLocation:"Location",
+       registerPassword:"Password",registerBtn:"Register",goLogin:"Already have an account? Login Here"},
+  mr: {loginTitle:"लॉगिन",loginName:"पूर्ण नाव",loginPassword:"पासवर्ड",loginBtn:"लॉगिन",goRegister:"नवीन वापरकर्ता? नोंदणी करा",
+       registerTitle:"नोंदणी",regName:"पूर्ण नाव",regMobile:"मोबाईल नंबर",regEmail:"ईमेल",regLocation:"स्थान",
+       registerPassword:"पासवर्ड",registerBtn:"नोंदणी",goLogin:"आधीच खाते आहे? लॉगिन करा"},
+  hi: {loginTitle:"लॉगिन",loginName:"पूरा नाम",loginPassword:"पासवर्ड",loginBtn:"लॉगिन",goRegister:"नया उपयोगकर्ता? यहाँ पंजीकरण करें",
+       registerTitle:"पंजीकरण",regName:"पूरा नाम",regMobile:"मोबाइल नंबर",regEmail:"ईमेल",regLocation:"स्थान",
+       registerPassword:"पासवर्ड",registerBtn:"पंजीकरण",goLogin:"पहले से खाता है? लॉगिन करें"},
+  pa: {loginTitle:"ਲਾਗਿਨ",loginName:"ਪੂਰਾ ਨਾਮ",loginPassword:"ਪਾਸਵਰਡ",loginBtn:"ਲਾਗਿਨ",goRegister:"ਨਵਾਂ ਯੂਜ਼ਰ? ਇੱਥੇ ਰਜਿਸਟਰ ਕਰੋ",
+       registerTitle:"ਰਜਿਸਟਰ",regName:"ਪੂਰਾ ਨਾਮ",regMobile:"ਮੋਬਾਈਲ ਨੰਬਰ",regEmail:"ਈਮੇਲ",regLocation:"ਸਥਾਨ",
+       registerPassword:"ਪਾਸਵਰਡ",registerBtn:"ਰਜਿਸਟਰ",goLogin:"ਪਹਿਲਾਂ ਹੀ ਖਾਤਾ ਹੈ? ਲਾਗਿਨ ਕਰੋ"}
+};
+
+function setLanguage(){
+  const lang=document.getElementById("language").value;
+  const t=translations[lang];
+  document.getElementById("loginTitle").innerText=t.loginTitle;
+  document.getElementById("loginName").placeholder=t.loginName;
+  document.getElementById("loginPassword").placeholder=t.loginPassword;
+  document.getElementById("loginBtn").innerText=t.loginBtn;
+  document.getElementById("goRegister").innerText=t.goRegister;
+  document.getElementById("registerTitle").innerText=t.registerTitle;
+  document.getElementById("regName").placeholder=t.regName;
+  document.getElementById("regMobile").placeholder=t.regMobile;
+  document.getElementById("regEmail").placeholder=t.regEmail;
+  document.getElementById("registerPassword").placeholder=t.registerPassword;
+  document.getElementById("registerBtn").innerText=t.registerBtn;
+  document.getElementById("goLogin").innerText=t.goLogin;
+}
+
+// Switch form
+function switchForm(type){
+  if(type==="register"){document.getElementById("loginForm").style.display="none";document.getElementById("registerForm").style.display="block";}
+  else{document.getElementById("registerForm").style.display="none";document.getElementById("loginForm").style.display="block";}
+}
+
+// Toggle password
+function togglePassword(id){
+  const input=document.getElementById(id);
+  input.type=(input.type==="password")?"text":"password";
+}
+
+// Dark mode toggle
+function toggleMode(){document.body.classList.toggle("dark");}
+
+// DateTime
+function updateDateTime(){
+  const now=new Date();
+  document.getElementById("datetime").innerText=now.toLocaleDateString()+" "+now.toLocaleTimeString();
+}
+setInterval(updateDateTime,1000);
+updateDateTime();
+
+// Admin credentials
+const adminCredentials = {name:"agrinova", password:"98971"};
+
+// Autocomplete data
+const states = ["Andhra Pradesh","Bihar","Karnataka","Maharashtra","Punjab"];
+const cities = ["Mumbai","Pune","Bangalore","Patna","Chandigarh"];
+const villages = ["Agar", "Bajpur", "Chandpur", "Dabri", "Eklaspur", "Fatehpur", "Gopalpur", "Harsol", "Ibrahimpur", "Jaitipur", "Kandarpur", "Laxmipur", "Mandarpur", "Nandgaon", "Ongole", "Panchgaon", "Qutubpur", "Rampur", "Sangam", "Tulsipur", "Udaypur", "Vijaynagar", "Wazirpur", "Yamunapur", "Zirapur", "Adalpur", "Bhopalpura", "Chokshi", "Devalgaon", "Eklera", "Firozpur", "Gadchiroli", "Hingoli", "Indergarh", "Jhalda", "Kopargaon", "Latur", "Mahuli", "Niwari", "Osian", "Pali", "Qila Raipur", "Rajgarh", "Satara", "Talwandi", "Upleta", "Vishnupur", "Wankaner", "Xolam", "Yelburga", "Zira", "Ahmadpur", "Bansgaon", "Chakradharpur", "Daund", "Eru", "Farrukhabad", "Ghatail", "Hajipur", "Israna", "Jatara", "Kundli", "Lohardaga", "Madhubani", "Nanded", "Orai", "Pithoragarh", "Quilaha", "Raisen", "Sikandrabad", "Tirora", "Udhampur", "Vijayapura", "Wadgaon", "Yavatmal", "Zamrudpur", "Ambikapur", "Bhind", "Chikhli", "Dharampur", "Eran", "Fatehabad", "Guntur", "Hoshangabad", "Itarsi", "Junnar", "Kanpur", "Lucknow", "Meerut", "Nagaur", "Ongole", "Patiala", "Raipur", "Saharanpur", "Thane", "Ujjain", "Varanasi", "Wardha", "Xanadu", "Yellapur", "Zirakpur", "Pandhard","Abu Said", "Adliwala", "Ajnala", "Akbarpur", "Alampur", "Aliwal", "Anayatpura", "Audar", "Awan Basau", "Awan Near Ramdas", "Awanlakha Singh", "Bachiwind", "Bagga", "Bajwa", "Bakraur", "Bal Labe Darya", "Balaggan", "Balbawa", "Ballaharwal", "Barar", "Barlas", "Bath", "Beharwal", "Behlol", "Bhadal", "Bhaggupur Bet"];
+function populateDatalist(listId, data){
+  const datalist=document.getElementById(listId);
+  datalist.innerHTML="";
+  data.forEach(item=>{const option=document.createElement("option");option.value=item;datalist.appendChild(option);});
+}
+populateDatalist("stateList",states);
+populateDatalist("cityList",cities);
+populateDatalist("villageList",villages);
+
+// Users storage
+let users = JSON.parse(localStorage.getItem("users")) || [];
+
+// Register function
+function registerUser(){
+  const name=document.getElementById("regName").value;
+  const mobile=document.getElementById("regMobile").value;
+  const email=document.getElementById("regEmail").value;
+  const state=document.getElementById("regState").value;
+  const city=document.getElementById("regCity").value;
+  const village=document.getElementById("regVillage").value;
+  const password=document.getElementById("registerPassword").value;
+  if(!name || !mobile || !email || !state || !city || !village || !password){alert("Please fill all fields"); return;}
+  const user={name,mobile,email,state,city,village,password};
+  users.push(user);
+  localStorage.setItem("users",JSON.stringify(users));
+  alert("Registration successful!");
+  switchForm("login");
+}
+
+// Login function
+function login(){
+  const name=document.getElementById("loginName").value;
+  const password=document.getElementById("loginPassword").value;
+  if(!name||!password){alert("Enter credentials");return;}
+  
+  // Admin check
+  if(name===adminCredentials.name && password===adminCredentials.password){
+      localStorage.setItem("role","admin");
+      window.location.href="admin.html";
+      return;
+  }
+  
+  // User check
+  const user = users.find(u=>u.name===name && u.password===password);
+  if(user){
+      localStorage.setItem("role","user");
+      localStorage.setItem("currentUser",JSON.stringify(user));
+      window.location.href="dashboard.html";
+  }else{
+      alert("Invalid credentials");
+  }
+}
+
+// Forgot Password
+function forgotPassword(){
+    const username = prompt("Enter your registered Full Name or Email:");
+    if(!username) return;
+    
+    // Check if admin
+    if(username === adminCredentials.name){
+        alert("Admin Password: " + adminCredentials.password);
+        return;
+    }
+    
+    // Check in users array
+    const user = users.find(u => u.name === username || u.email === username);
+    if(user){
+        alert("Your password is: " + user.password);
+    } else {
+        alert("User not found!");
+    }
+}
+</script>
+</body>
+</html>
+>

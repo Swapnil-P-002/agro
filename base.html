@@ -1,0 +1,758 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>AGRINOVA — Farm Buddy</title>
+
+  <!-- Leaflet & Draw CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css"/>
+
+  <style>
+    :root{
+      --accent:#118c4f; --muted:#6b7280; --card:#ffffff; --bg:#f6fff6;
+    }
+    body{font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial; margin:0; background:linear-gradient(180deg,#f7fff7,#fbfff9); color:#0b1220}
+    header{display:flex; align-items:center; gap:12px; padding:12px 20px; background:#f0fff4; border-bottom:1px solid rgba(8,18,10,0.04)}
+    .logo{display:flex; gap:12px; align-items:center}
+    .logo h1{margin:0; color:var(--accent)}
+    .top-right{margin-left:auto; display:flex; gap:12px; align-items:center}
+    .container{max-width:1200px; margin:18px auto; display:grid; grid-template-columns:1fr 360px; gap:18px; padding:0 12px}
+    .card{background:var(--card); padding:14px; border-radius:10px; box-shadow:0 6px 22px rgba(8,18,10,0.04)}
+    .small-muted{color:var(--muted); font-size:13px}
+    .btn{background:var(--accent); color:white; padding:8px 12px; border-radius:8px; border:none; cursor:pointer}
+    .btn.ghost{background:transparent; color:var(--accent); border:1px solid rgba(17,140,79,0.12)}
+    /* map modal small */
+    #mapModal { position: fixed; left:0; top:0; right:0; bottom:0; display:none; align-items:center; justify-content:center; background: rgba(0,0,0,0.35); z-index:6000;}
+    #mapModal .modal-wrap{ width:820px; max-width:96%; background:white; border-radius:10px; overflow:hidden; display:flex; flex-direction:column; }
+    #mapSmall { height:480px; width:100%; }
+    .modal-header{display:flex; justify-content:space-between; align-items:center; padding:10px 12px; border-bottom:1px solid #eef6ee}
+    .modal-footer{display:flex; gap:8px; justify-content:flex-end; padding:10px 12px; border-top:1px solid #eef6ee}
+    /* saved fields list */
+    #savedFieldsWrap{ position:fixed; left:18px; top:86px; width:260px; z-index:4000; }
+    .field-card{ background:white; padding:8px; border-radius:10px; box-shadow:0 8px 18px rgba(8,18,10,0.04); margin-bottom:10px; display:flex; gap:10px; align-items:center}
+    .mini-map{ width:90px; height:70px; border-radius:6px; overflow:hidden; border:1px solid #eef6ee }
+    /* Recommendations UI */
+    .seg{display:flex; gap:8px; margin:8px 0; flex-wrap:wrap}
+    .seg button{padding:8px 12px; border-radius:8px; border:1px solid #e6f2ea; background:transparent; cursor:pointer}
+    .seg button.active{background:var(--accent); color:white}
+    .rec-list{display:flex; flex-direction:column; gap:12px; margin-top:12px}
+    .rec-card{ border-radius:12px; padding:14px; border:1px solid #eef6ee; display:grid; grid-template-columns:1fr 180px; gap:12px; align-items:center}
+    .bar-wrap{height:8px; background:#f0f0f0; border-radius:6px; overflow:hidden}
+    .bar-inner{height:8px; background:linear-gradient(90deg,var(--accent),#18b26a); width:40%}
+    /* right panel adjustments */
+    @media(max-width:980px){ .container{grid-template-columns:1fr; } #savedFieldsWrap{ position:static; width:auto; } .rec-card{ grid-template-columns:1fr } }
+  </style>
+</head>
+
+<body>
+  <header>
+    <div class="logo">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none"><path d="M4 12c0-4.418 3.582-8 8-8 .78 0 1.53.12 2.24.34A7.002 7.002 0 0 0 12 4C7.58 4 4 7.582 4 12z" fill="#118c4f"/></svg>
+      <div>
+        <h1>AGRINOVA</h1>
+        <div class="small-muted" id="greeting">Welcome back, Farmer</div>
+      </div>
+    </div>
+
+    <div class="top-right">
+      <div class="small-muted" id="farmSummary">0.000 acres • Location unknown</div>
+      <select id="langSelect" style="padding:6px;border-radius:6px;border:1px solid #e6f2ea">
+        <option value="en">English</option>
+        <option value="hi">हिन्दी</option>
+        <option value="mr">मराठी</option>
+        <option value="pa">ਪੰਜਾਬੀ</option>
+      </select>
+    </div>
+    
+  </header>
+  
+  
+
+  <!-- Saved fields floating -->
+  <div id="savedFieldsWrap"></div>
+
+  <div class="container">
+    <!-- MAIN COLUMN -->
+    <div>
+      <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <div style="display:flex; gap:10px; align-items:center;">
+              <button id="openMapBtn" class="btn">➕ <span id="txtAddField">Add field</span></button>
+              <button id="openHealBtn" class="btn ghost">🩺 <span id="txtHeal">Heal your crop</span></button>
+              <button id="openCostBtn" class="btn ghost">📈 <span id="txtCost">Cost analysis</span></button>
+            </div>
+            <div class="small-muted" id="hintText">Mark and save fields using the satellite map.</div>
+          </div>
+          <div style="text-align:right">
+            <div style="font-weight:700" id="selectedAcres">0.000 acres</div>
+            <div class="small-muted" id="locationLabel">Location: —</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recommendations card -->
+      <div class="card" style="margin-top:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div>
+            <h2 id="txtRecTitle">AI-Powered Crop Recommendations</h2>
+            <div class="small-muted" id="txtRecDesc">Personalized suggestions based on your farm data.</div>
+          </div>
+          <div style="display:flex; gap:8px; align-items:center;">
+            <select id="sortSelect" style="padding:8px;border-radius:8px;border:1px solid #e9f1ea">
+              <option value="score">Sort: Suitability</option>
+              <option value="profit">Sort: Estimated profit</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;">
+          <div class="seg">
+            <button class="season-btn active" data-season="all">All</button>
+            <button class="season-btn" data-season="spring">Spring</button>
+            <button class="season-btn" data-season="summer">Summer</button>
+            <button class="season-btn" data-season="rainy">Rainy</button>
+            <button class="season-btn" data-season="winter">Winter</button>
+          </div>
+
+          <div style="display:flex; gap:8px; margin-top:8px; align-items:center;" class="filters">
+            <label class="small-muted">Soil</label>
+            <select id="soilSelect" style="padding:6px;border-radius:8px;border:1px solid #e9f1ea">
+              <option value="loam">Loam</option><option value="sandy">Sandy</option><option value="clay">Clay</option><option value="silty">Silty</option>
+            </select>
+            <label class="small-muted">pH</label>
+            <input id="phInput" type="number" step="0.1" value="6.5" style="width:80px;padding:6px;border-radius:6px;border:1px solid #e9f1ea">
+            <label class="small-muted">Moisture (%)</label>
+            <input id="moistInput" type="number" step="1" value="50" style="width:100px;padding:6px;border-radius:6px;border:1px solid #e9f1ea">
+            <label class="small-muted">Temp (°C)</label>
+            <input id="tempInput" type="number" step="0.5" value="25" style="width:100px;padding:6px;border-radius:6px;border:1px solid #e9f1ea">
+            <button id="applyFilters" class="btn ghost">Apply</button>
+          </div>
+
+          <div id="recList" class="rec-list"></div>
+        </div>
+      </div>
+
+      <!-- small saved fields list (non-floating for narrow screens) -->
+      <div class="card" style="margin-top:12px;">
+        <h3>Saved Fields</h3>
+        <div class="small-muted">Fields you saved from the map.</div>
+        <div id="fieldsPanelList" style="margin-top:10px"></div>
+      </div>
+
+    </div>
+
+    <!-- RIGHT PANEL (kept consistent with previous design) -->
+    <div>
+      <div id="healPanel" class="card" style="display:none;">
+        <h3>Heal your crop</h3>
+        <div class="small-muted">Upload a photo. The system will check if it contains crop and give a mock diagnosis.</div>
+        <label for="cropImage">Photo</label>
+        <input type="file" id="cropImage" accept="image/*">
+        <div id="healResult" style="margin-top:10px"></div>
+      </div>
+
+      <div id="costPanel" class="card" style="display:none;">
+        <h3>Cost Analysis</h3>
+        <label>Choose saved field</label>
+        <select id="selectField"><option value="">-- choose field --</option></select>
+
+        <label style="margin-top:8px">Choose crop</label>
+        <select id="selectCrop"></select>
+
+        <label style="margin-top:8px">Acres (auto)</label>
+        <input id="inputAcres" type="number" step="0.01">
+
+        <label style="margin-top:8px">Cost components per acre (₹)</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+          <input id="costSeed" placeholder="Seeds" value="5000">
+          <input id="costFert" placeholder="Fertilizer" value="8000">
+          <input id="costLabor" placeholder="Labor" value="12000">
+          <input id="costIrr" placeholder="Irrigation" value="3000">
+        </div>
+        <input id="miscCost" placeholder="Misc per acre" value="2000" style="margin-top:8px">
+        <button id="calcBtn" class="btn" style="margin-top:8px">Calculate</button>
+        <div id="costResults" style="margin-top:8px"></div>
+      </div>
+
+      <div class="card" style="margin-top:12px">
+        <h3>Crop DB (sample)</h3>
+        <div class="small-muted" id="cropDbPreview"></div>
+      </div>
+    </div>
+  </div>
+
+  <footer style="text-align:center;padding:12px;color:var(--muted)">AGRINOVA — prototype. Replace placeholder endpoints with your backend (Agmarknet/OpenWeather/diagnosis model).</footer>
+
+  <!-- Map modal -->
+  <div id="mapModal" role="dialog" aria-hidden="true">
+    <div class="modal-wrap">
+      <div class="modal-header">
+        <div><strong id="mapModalTitle">Select field on map</strong><div class="small-muted" id="mapModalHint">Draw polygon on satellite map and save.</div></div>
+        <div><button id="closeMap" class="btn ghost">Close</button></div>
+      </div>
+      <div id="mapSmall"></div>
+      <div class="modal-footer">
+        <div class="small-muted" id="modalAreaReadout">Area: 0.000 acres</div>
+        <div style="flex:1"></div>
+        <button id="zoomToLocate" class="btn ghost">Locate me</button>
+        <button id="saveMapField" class="btn">Save Field</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- External libs -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Turf.js/6.5.0/turf.min.js"></script>
+
+  <script>
+/* ============================
+   Embedded translations (i18n)
+   ============================ */
+const LANG = {
+  en: {
+    addField: "Add field", heal: "Heal your crop", cost: "Cost analysis",
+    recTitle: "AI-Powered Crop Recommendations",
+    recDesc: "Personalized suggestions based on your farm's data.",
+    hint: "Mark and save fields using the satellite map.",
+    saveField: "Save Field", close: "Close", locate: "Locate me",
+    apply: "Apply", selectField: "-- choose field --", selectCrop: "-- choose crop --",
+    areaLabel: "Area", notCrop: "Not a crop photo", diagnose: "Diagnosis (mock)",
+    fetchPrice: "Fetch market price"
+  },
+  hi: {
+    addField: "क्षेत्र जोड़ें", heal: "फसल ठीक करें", cost: "लागत विश्लेषण",
+    recTitle: "AI-आधारित फसल अनुशंसाएँ",
+    recDesc: "आपके खेत के डेटा के आधार पर सुझाव।",
+    hint: "सैटेलाइट मानचित्र का उपयोग कर क्षेत्र चिह्नित करें और सहेजें।",
+    saveField: "क्षेत्र सहेजें", close: "बंद करें", locate: "मुझे खोजें",
+    apply: "लागू करें", selectField: "-- क्षेत्र चुनें --", selectCrop: "-- फसल चुनें --",
+    areaLabel: "क्षेत्रफल", notCrop: "फसल फोटो नहीं है", diagnose: "निदान (नमूना)",
+    fetchPrice: "बाजार मूल्य लें"
+  },
+  mr: {
+    addField: "शेत जोडा", heal: "पिक बरे करा", cost: "खर्च विश्लेषण",
+    recTitle: "AI-आधारित पिक शिफारसी",
+    recDesc: "शेताच्या डेटावर आधारित वैयक्तिक शिफारसी.",
+    hint: "सॅटेलाइट नकाशावर आपले क्षेत्र चिन्हांकित करा व जतन करा.",
+    saveField: "शेत साठवा", close: "बंद करा", locate: "मला शोधा",
+    apply: "लागू करा", selectField: "-- क्षेत्र निवडा --", selectCrop: "-- पीक निवडा --",
+    areaLabel: "क्षेत्रफळ", notCrop: "पिकाचे फोटो नाही", diagnose: "निदान (नक्कल)",
+    fetchPrice: "बाजार भाव घ्या"
+  },
+  pa: {
+    addField: "ਖੇਤਰ ਸ਼ਾਮਲ ਕਰੋ", heal: "ਆਪਣੀ ਫਸਲ ਠੀਕ ਕਰੋ", cost: "ਲਾਗਤ ਵਿਸ਼ਲੇਸ਼ਣ",
+    recTitle: "AI-ਅਧਾਰਿਤ ਫਸਲ ਸਿਫਾਰਸ਼ਾਂ",
+    recDesc: "ਤੁਹਾਡੇ ਖੇਤ ਦੇ ਡੇਟਾ ਦੇ ਆਧਾਰ 'ਤੇ ਵਿਅਕਤੀਗਤ ਸੁਝਾਅ।",
+    hint: "ਸੈਟੇਲਾਈਟ ਨਕਸ਼ਾ ਵਰਤ ਕੇ ਖੇਤਰ ਚਿੰਨ੍ਹਿਤ ਕਰੋ ਅਤੇ ਸੇਵ ਕਰੋ।",
+    saveField: "ਖੇਤਰ ਸੇਵ ਕਰੋ", close: "ਬੰਦ ਕਰੋ", locate: "ਮੈਨੂੰ ਲੱਭੋ",
+    apply: "ਲਾਗੂ ਕਰੋ", selectField: "-- ਖੇਤਰ ਚੁਣੋ --", selectCrop: "-- ਫਸਲ ਚੁਣੋ --",
+    areaLabel: "ਖੇਤਰਫਲ", notCrop: "ਫਸਲ ਦੀ ਫੋਟੋ ਨਹੀਂ", diagnose: "ਨਿਧਾਨ (ਨਮੂਨਾ)",
+    fetchPrice: "ਬਾਜ਼ਾਰ ਮੁੱਲ ਪ੍ਰਾਪਤ ਕਰੋ"
+  }
+};
+
+
+let currentLang = 'en';
+function tr(k){ return (LANG[currentLang] && LANG[currentLang][k]) ? LANG[currentLang][k] : (LANG['en'][k]||k); }
+document.getElementById('langSelect').addEventListener('change', (e)=>{ currentLang = e.target.value; applyLang(); });
+
+function applyLang(){
+  document.getElementById('txtAddField').textContent = tr('addField');
+  document.getElementById('txtHeal').textContent = tr('heal');
+  document.getElementById('txtCost').textContent = tr('cost');
+  document.getElementById('txtRecTitle').textContent = tr('recTitle');
+  document.getElementById('txtRecDesc').textContent = tr('recDesc');
+  document.getElementById('hintText').textContent = tr('hint');
+  document.getElementById('mapModalTitle').textContent = tr('saveField');
+  document.getElementById('mapModalHint').textContent = tr('hint');
+  document.getElementById('saveMapField').textContent = tr('saveField');
+  document.getElementById('closeMap').textContent = tr('close');
+  document.getElementById('zoomToLocate').textContent = tr('locate');
+  document.getElementById('applyFilters').textContent = tr('apply');
+  // update selects defaults
+  const selField = document.getElementById('selectField');
+  if (selField) selField.querySelectorAll('option')[0].textContent = tr('selectField');
+  const selCrop = document.getElementById('selectCrop');
+  if (selCrop) selCrop.querySelectorAll('option')[0].textContent = tr('selectCrop');
+}
+
+/* ============================
+   Crop Database (sample state-wise)
+   - Expand this JSON to include ALL crops & states as needed.
+   - Fields: id,name,type,seasons,soilTypes,idealTemp,idealMoisture,soilPH,durationDays,avgYield_t_per_ha,avgPrice_Rs_per_t,states,growGuide (string),inputs(fertilizer etc.)
+   ============================ */
+const cropDB = [
+  { id:'wheat', name:'Wheat', type:'Cereal', seasons:['winter'], soilTypes:['loam','silty'], idealTemp:[10,25], idealMoisture:[40,70], soilPH:[6.0,8.0], durationDays:120, avgYield_t_per_ha:3.0, avgPrice_Rs_per_t:22000, states:['Punjab','Haryana','UP','Rajasthan'], growGuide:'Sow in cool season; maintain moisture early; NPK per soil test', inputs:{fertilizer:'Urea, DAP', irrigation:'Moderate'} },
+  { id:'rice', name:'Rice', type:'Cereal', seasons:['summer','rainy'], soilTypes:['clay','silty'], idealTemp:[20,32], idealMoisture:[60,100], soilPH:[5.5,7.5], durationDays:120, avgYield_t_per_ha:3.5, avgPrice_Rs_per_t:20000, states:['West Bengal','Punjab','UP','Tamil Nadu','Assam'], growGuide:'Transplant seedlings; standing water management', inputs:{fertilizer:'NPK, Zn', irrigation:'High'} },
+  { id:'maize', name:'Maize', type:'Cereal', seasons:['summer','spring'], soilTypes:['loam','sandy'], idealTemp:[18,27], idealMoisture:[40,70], soilPH:[5.5,7.5], durationDays:110, avgYield_t_per_ha:4.0, avgPrice_Rs_per_t:15000, states:['Karnataka','Maharashtra','Andhra Pradesh','TN'], growGuide:'Use hybrid seeds; timely weeding', inputs:{fertilizer:'DAP, Urea', irrigation:'Moderate'} },
+  { id:'cotton', name:'Cotton', type:'Fiber', seasons:['summer'], soilTypes:['sandy','loam'], idealTemp:[20,35], idealMoisture:[30,60], soilPH:[5.5,7.5], durationDays:150, avgYield_t_per_ha:1.2, avgPrice_Rs_per_t:70000, states:['Maharashtra','Gujarat','Telangana'], growGuide:'Plant in warm season; pest monitoring (bollworms)', inputs:{fertilizer:'NPK', irrigation:'Low-Moderate'} },
+  { id:'sugarcane', name:'Sugarcane', type:'Cash', seasons:['summer'], soilTypes:['loam','clay'], idealTemp:[21,32], idealMoisture:[60,90], soilPH:[6.0,7.5], durationDays:360, avgYield_t_per_ha:80, avgPrice_Rs_per_t:3000, states:['UP','Maharashtra','Karnataka'], growGuide:'Long-duration ratoon crop; requires high water', inputs:{fertilizer:'NPK+Micros', irrigation:'High'} },
+  { id:'soybean', name:'Soybean', type:'Oilseed', seasons:['summer'], soilTypes:['loam','sandy'], idealTemp:[20,30], idealMoisture:[40,60], soilPH:[6.0,7.5], durationDays:110, avgYield_t_per_ha:1.2, avgPrice_Rs_per_t:35000, states:['Madhya Pradesh','Maharashtra'], growGuide:'Sowing after monsoon onset; inoculate seed', inputs:{fertilizer:'Low N, P', irrigation:'Low-Moderate'} },
+  { id:'groundnut', name:'Groundnut', type:'Oilseed', seasons:['spring','summer'], soilTypes:['sandy','loam'], idealTemp:[20,35], idealMoisture:[40,60], soilPH:[5.0,7.0], durationDays:120, avgYield_t_per_ha:2.5, avgPrice_Rs_per_t:45000, states:['Gujarat','Andhra Pradesh','TN','Karnataka'], growGuide:'Require well-drained soils; timely gypsum', inputs:{fertilizer:'P,K', irrigation:'Moderate'} },
+  { id:'tea', name:'Tea', type:'Perennial', seasons:['all'], soilTypes:['silty','clay'], idealTemp:[18,30], idealMoisture:[70,100], soilPH:[4.5,5.5], durationDays:9999, avgYield_t_per_ha:10, avgPrice_Rs_per_t:200000, states:['Assam','WB','TN','Kerala'], growGuide:'Shade and high rainfall; pruning & plucking management', inputs:{fertilizer:'Organic+NPK', irrigation:'High'} },
+  { id:'coffee', name:'Coffee', type:'Perennial', seasons:['all'], soilTypes:['loam','silty'], idealTemp:[18,24], idealMoisture:[60,80], soilPH:[5.5,6.5], durationDays:9999, avgYield_t_per_ha:1.2, avgPrice_Rs_per_t:450000, states:['Karnataka','Kerala','TN'], growGuide:'Shade, well-drained, pest control', inputs:{fertilizer:'NPK', irrigation:'Moderate'} }
+  // Expand: Add all crops and state lists here. For very large lists, move to a JSON file and load via fetch.
+];
+
+
+/* =========
+   Map + drawing logic (modal small map)
+   - Uses Leaflet + Leaflet.draw
+   - Auto calculates area in acres with turf
+   - Save field: stored in savedFields[] and displayed as saved cards with mini map
+   ========= */
+const ACRES_PER_M2 = 1 / 4046.8564224;
+let smallMap, drawControlSmall, drawnLayerSmall;
+let savedFields = []; // {id,name,geojson,acres,bounds}
+
+function openMapModal(){
+  document.getElementById('mapModal').style.display = 'flex';
+  setTimeout(()=>{ smallMap.invalidateSize(); },200);
+}
+function closeMapModal(){ document.getElementById('mapModal').style.display = 'none'; }
+
+document.getElementById('openMapBtn').addEventListener('click', openMapModal);
+document.getElementById('closeMap').addEventListener('click', closeMapModal);
+
+/* init small map only once */
+function initSmallMap(){
+  if (smallMap) return;
+  smallMap = L.map('mapSmall', { center:[20.5937,78.9629], zoom:5 });
+  const sat = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}').addTo(smallMap);
+  L.control.layers({'Satellite':sat, 'OSM': L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png')}).addTo(smallMap);
+
+  const drawnItems = new L.FeatureGroup().addTo(smallMap);
+  drawControlSmall = new L.Control.Draw({
+    draw:{ polygon:true, rectangle:false, polyline:false, circle:false, marker:false, circlemarker:false },
+    edit:{ featureGroup: drawnItems }
+  });
+  smallMap.addControl(drawControlSmall);
+
+  smallMap.on(L.Draw.Event.CREATED, function(e){
+    if (drawnLayerSmall) { drawnItems.removeLayer(drawnLayerSmall); drawnLayerSmall=null; }
+    drawnLayerSmall = e.layer;
+    drawnItems.addLayer(drawnLayerSmall);
+    updateModalArea(drawnLayerSmall);
+    // open popup prompting save (optional)
+  });
+
+  smallMap.on(L.Draw.Event.EDITED, function(e){
+    e.layers.eachLayer(l=>{ if (l===drawnLayerSmall) updateModalArea(l); });
+  });
+
+  // Save
+  document.getElementById('saveMapField').addEventListener('click', ()=>{
+    if (!drawnLayerSmall) { alert('Draw a polygon first'); return; }
+    const geojson = drawnLayerSmall.toGeoJSON();
+    const bounds = drawnLayerSmall.getBounds();
+    const areaM2 = turf.area(geojson);
+    const acres = areaM2 * ACRES_PER_M2;
+    const name = prompt('Field name (optional)', `Field ${savedFields.length+1}`) || `Field ${savedFields.length+1}`;
+    const id = 'f'+Date.now();
+    savedFields.push({id, name, geojson, acres, bounds});
+    renderSavedFields();
+    updateSavedSelect();
+    updateFarmSummary();
+    closeMapModal();
+  });
+
+  // locate me
+  document.getElementById('zoomToLocate').addEventListener('click', ()=>{
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos=>{
+        const lat=pos.coords.latitude, lon=pos.coords.longitude;
+        smallMap.setView([lat,lon],15);
+      }, err=>{ alert('Location error'); });
+    } else alert('Geolocation not supported');
+  });
+}
+
+/* update modal area readout */
+function updateModalArea(layer){
+  try {
+    const geojson = layer.toGeoJSON();
+    const areaM2 = turf.area(geojson);
+    const acres = areaM2 * ACRES_PER_M2;
+    document.getElementById('modalAreaReadout').textContent = `${tr('areaLabel')}: ${acres.toFixed(3)} acres`;
+    // also reflect on main page selectedAcres preview
+    document.getElementById('selectedAcres').textContent = `${acres.toFixed(3)} acres`;
+    document.getElementById('selectedAcres').dataset.acres = acres;
+  } catch(e){ console.error(e); }
+}
+
+/* render saved fields into floating panel and right panel */
+function renderSavedFields(){
+  const wrap = document.getElementById('savedFieldsWrap');
+  wrap.innerHTML = '';
+  savedFields.forEach(f=>{
+    const el = document.createElement('div'); el.className='field-card';
+    const mini = document.createElement('div'); mini.className='mini-map';
+    const info = document.createElement('div'); info.style.flex='1';
+    info.innerHTML = `<strong>${f.name}</strong><div class="small-muted">${f.acres.toFixed(3)} acres</div>
+      <div style="margin-top:6px"><button class="btn ghost" onclick="zoomToField('${f.id}')">Zoom</button><button class="btn" style="margin-left:6px" onclick="useField('${f.id}')">Use</button></div>`;
+    el.appendChild(mini); el.appendChild(info);
+    wrap.appendChild(el);
+    // create mini map
+    setTimeout(()=>{
+      const m = L.map(mini, { attributionControl:false, zoomControl:false, dragging:false, scrollWheelZoom:false }).setView([ (f.bounds.getSouth()+f.bounds.getNorth())/2, (f.bounds.getWest()+f.bounds.getEast())/2 ], 13);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+      L.geoJSON(f.geojson, { style:{color: '#118c4f'} }).addTo(m);
+      m.fitBounds(f.bounds);
+    },50);
+  });
+
+  // also render in fieldsPanelList
+  const panel = document.getElementById('fieldsPanelList');
+  panel.innerHTML = savedFields.map(f=>`<div style="padding:8px;border-radius:8px;border:1px solid #eef6ee;margin-bottom:8px;"><strong>${f.name}</strong><div class="small-muted">${f.acres.toFixed(3)} acres</div></div>`).join('');
+}
+
+function zoomToField(id){
+  const f = savedFields.find(s=>s.id===id);
+  if (!f) return alert('Field not found');
+  // open main map in modal and zoom? We'll zoom the smallMap if open, otherwise set global view (smallMap)
+  if (smallMap) smallMap.fitBounds(f.bounds);
+}
+
+function useField(id){
+  const f = savedFields.find(s=>s.id===id);
+  if (!f) return;
+  document.getElementById('selectField').value = id;
+  document.getElementById('inputAcres').value = Number(f.acres.toFixed(3));
+  // open cost panel
+  openPanel('cost');
+}
+
+/* update saved select for cost panel */
+function updateSavedSelect(){
+  const sel = document.getElementById('selectField');
+  sel.innerHTML = `<option value="">${tr('selectField')}</option>`;
+  savedFields.forEach(f=>{
+    const o = document.createElement('option'); o.value=f.id; o.textContent=`${f.name} — ${f.acres.toFixed(3)} ac`; sel.appendChild(o);
+  });
+}
+
+/* update farm summary total acres */
+function updateFarmSummary(){
+  const total = savedFields.reduce((s,f)=>s+f.acres,0);
+  document.getElementById('farmSummary').textContent = `${total.toFixed(3)} acres • Farm location`;
+}
+
+/* =========
+   Recommendations engine (frontend)
+   - Inputs: season, soilType, ph, moisture, temp, sortBy
+   - Output: list sorted by score (suitability) or profit
+   ========= */
+
+function scoreCrop(crop, inputs){
+  // score 0-100 composite of season, soil, temp, moisture, pH, market
+  let score = 0;
+  // season
+  if (inputs.season === 'all' || crop.seasons.includes(inputs.season)) score += 25;
+  // soil match
+  if (crop.soilTypes.includes(inputs.soilType)) score += 15;
+  // temp closeness
+  const tMid = (crop.idealTemp[0] + crop.idealTemp[1]) / 2;
+  const tRange = Math.max(1, Math.abs(crop.idealTemp[1]-crop.idealTemp[0]));
+  const tScore = Math.max(0, 20 - (Math.abs(inputs.temp - tMid)/tRange)*20);
+  score += tScore;
+  // moisture
+  const mMid = (crop.idealMoisture[0] + crop.idealMoisture[1]) / 2;
+  const mRange = Math.max(1, Math.abs(crop.idealMoisture[1] - crop.idealMoisture[0]) || 10);
+  const mScore = Math.max(0, 20 - (Math.abs(inputs.moisture - mMid)/mRange)*20);
+  score += mScore;
+  // pH closeness if available
+  const pMid = (crop.soilPH && crop.soilPH[0]) ? (crop.soilPH[0]+crop.soilPH[1])/2 : 6.5;
+  const pRange = (crop.soilPH && Math.abs(crop.soilPH[1]-crop.soilPH[0])) || 1;
+  const pScore = Math.max(0, 10 - (Math.abs(inputs.ph - pMid)/Math.max(0.5,pRange))*10);
+  score += pScore;
+  // market boost by avgPrice
+  const marketBoost = Math.min(10, (crop.avgPrice_Rs_per_t/100000)*10);
+  score += marketBoost;
+  return Math.min(100, score);
+}
+
+function computeProfitEstimate(crop, acres, costPerAcre){
+  const acresPerHa = 2.47105381;
+  const yieldPerAcre_t = crop.avgYield_t_per_ha / acresPerHa;
+  const production_t = yieldPerAcre_t * acres;
+  const pricePerT = crop.avgPrice_Rs_per_t; // placeholder; replace with Agmarknet
+  const revenue = production_t * pricePerT;
+  const totalCost = costPerAcre * acres;
+  const profit = revenue - totalCost;
+  return {production_t, revenue, profit, pricePerT};
+}
+
+function renderRecommendations(){
+  const season = document.querySelector('.season-btn.active').dataset.season || 'all';
+  const soil = document.getElementById('soilSelect').value;
+  const ph = Number(document.getElementById('phInput').value);
+  const moisture = Number(document.getElementById('moistInput').value);
+  const temp = Number(document.getElementById('tempInput').value);
+  const sortBy = document.getElementById('sortSelect').value;
+  const acres = Number(document.getElementById('selectedAcres').dataset.acres || 1);
+  // costPerAcre fallback from right panel
+  const seed = Number(document.getElementById('costSeed').value || 0);
+  const fert = Number(document.getElementById('costFert').value || 0);
+  const labor = Number(document.getElementById('costLabor').value || 0);
+  const irr = Number(document.getElementById('costIrr').value || 0);
+  const misc = Number(document.getElementById('miscCost').value || 0);
+  const costPerAcre = seed+fert+labor+irr+misc || 20000;
+
+  let scored = cropDB.map(c=>{
+    const s = scoreCrop(c, {season, soilType:soil, ph, moisture, temp});
+    const {production_t, revenue, profit, pricePerT} = computeProfitEstimate(c, acres, costPerAcre);
+    return {...c, score:s, estProduction:production_t, estRevenue:revenue, estProfit:profit, pricePerT};
+  });
+
+  // Optionally filter by season (still we keep all but may show preference)
+  // For user's request we will rank all crops but show season-fit first via score
+  if (sortBy === 'profit') scored.sort((a,b)=>b.estProfit - a.estProfit);
+  else scored.sort((a,b)=>b.score - a.score);
+
+  const container = document.getElementById('recList');
+  container.innerHTML = '';
+  scored.forEach((c, idx)=>{
+    const card = document.createElement('div'); card.className='rec-card';
+    const left = document.createElement('div');
+    left.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center;">
+      <div>
+        <div style="display:flex; gap:8px; align-items:center;"><h3 style="margin:0">${c.name}</h3><div style="background:#e8f8ef;color:var(--accent);padding:6px;border-radius:10px;font-weight:700;font-size:13px">#${idx+1}</div></div>
+        <div class="small-muted">${c.type} • ${c.durationDays} days • States: ${c.states.join(', ')}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="small-muted">Score</div>
+        <div style="font-weight:700">${c.score.toFixed(1)}/100</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;">
+      <div class="bar-wrap"><div class="bar-inner" style="width:${Math.min(100,c.score)}%"></div></div>
+    </div>
+    <div style="margin-top:10px;">
+      <strong>Why:</strong>
+      <ul class="small-muted" style="margin:6px 0 0 18px">${generateWhy(c, {season, soil, ph, moisture, temp})}</ul>
+    </div>
+    `;
+    const right = document.createElement('div');
+    right.innerHTML = `<div style="background:#f6fff6;padding:10px;border-radius:8px;text-align:center"><div class="small-muted">Est revenue</div><div style="font-weight:700">₹${Math.round(c.estRevenue/c.acres || c.estRevenue).toLocaleString()}</div></div>
+      <div style="height:8px"></div>
+      <div style="background:#fff7f0;padding:10px;border-radius:8px;text-align:center"><div class="small-muted">Est profit</div><div style="font-weight:700;color:#b45309">₹${Math.round(c.estProfit).toLocaleString()}</div></div>
+      <div style="margin-top:8px;display:flex;gap:8px;">
+        <button class="btn" onclick="selectCrop('${c.id}')">Select</button>
+        <button class="btn ghost" onclick="viewCropDetail('${c.id}')">Details</button>
+      </div>`;
+    card.appendChild(left); card.appendChild(right);
+    container.appendChild(card);
+  });
+}
+
+function generateWhy(crop, inputs){
+  const reasons = [];
+  if (inputs.season==='all' || crop.seasons.includes(inputs.season)) reasons.push('Suitable for selected season');
+  else reasons.push('Better in other seasons (lower priority)');
+  if (crop.soilTypes.includes(inputs.soil)) reasons.push('Matches soil type');
+  else reasons.push('Soil improvement recommended');
+  const tMid = (crop.idealTemp[0]+crop.idealTemp[1])/2;
+  if (Math.abs(inputs.temp - tMid) < 5) reasons.push('Temperature favourable');
+  else reasons.push('Temperature may be suboptimal');
+  const mMid = (crop.idealMoisture[0]+crop.idealMoisture[1])/2;
+  if (Math.abs(inputs.moisture - mMid) < 10) reasons.push('Moisture suitable');
+  else reasons.push('Irrigation or drainage recommended');
+  if (crop.soilPH){
+    const pMid=(crop.soilPH[0]+crop.soilPH[1])/2; if (Math.abs(inputs.ph - pMid) < 0.7) reasons.push('pH suitable'); else reasons.push('Soil pH adjustment recommended');
+  }
+  return reasons.map(r=>`<li>${r}</li>`).join('');
+}
+
+/* Select crop -> open cost panel and prefill crop */
+function selectCrop(id){
+  document.getElementById('selectCrop').value = id;
+  openPanel('cost');
+}
+function viewCropDetail(id){
+  const c = cropDB.find(x=>x.id===id);
+  if (!c) return alert('Not found');
+  // show detailed modal-like info (simple alert for now)
+  alert(`${c.name}\nType: ${c.type}\nDuration: ${c.durationDays} days\nIdeal Temp: ${c.idealTemp.join('-')} °C\nMoisture: ${c.idealMoisture.join('-')} %\nSoil pH: ${c.soilPH ? c.soilPH.join('-') : 'N/A'}\n\nGrow guide:\n${c.growGuide}\n\nInputs: ${JSON.stringify(c.inputs)}`);
+}
+
+/* =========
+   Cost analysis calculations
+   ========= */
+document.getElementById('calcBtn').addEventListener('click', ()=>{
+  const fieldId = document.getElementById('selectField').value;
+  const acres = Number(document.getElementById('inputAcres').value) || 0;
+  if (!acres || acres <= 0) return alert('Select field or enter acres');
+  const cropId = document.getElementById('selectCrop').value;
+  const crop = cropDB.find(c=>c.id===cropId);
+  if (!crop) return alert('Select a crop');
+
+  const seed = Number(document.getElementById('costSeed').value || 0);
+  const fert = Number(document.getElementById('costFert').value || 0);
+  const labor = Number(document.getElementById('costLabor').value || 0);
+  const irr = Number(document.getElementById('costIrr').value || 0);
+  const misc = Number(document.getElementById('miscCost').value || 0);
+  const costPerAcre = seed + fert + labor + irr + misc;
+  const acresPerHa = 2.47105381;
+  const yieldPerAcre_t = crop.avgYield_t_per_ha / acresPerHa;
+  const expectedProduction_t = yieldPerAcre_t * acres;
+
+  // price placeholder — replace this fetch with Agmarknet integration
+  const pricePerT = crop.avgPrice_Rs_per_t;
+  const revenue = expectedProduction_t * pricePerT;
+  const totalCost = costPerAcre * acres;
+  const profit = revenue - totalCost;
+
+  const resDiv = document.getElementById('costResults');
+  resDiv.innerHTML = `<div><strong>Crop:</strong> ${crop.name}</div>
+    <div><strong>Area:</strong> ${acres.toFixed(3)} acres</div>
+    <div><strong>Cost per acre:</strong> ₹${costPerAcre.toLocaleString()}</div>
+    <div><strong>Total cost:</strong> ₹${totalCost.toLocaleString()}</div>
+    <div><strong>Expected production:</strong> ${expectedProduction_t.toFixed(2)} tonnes</div>
+    <div><strong>Price (placeholder):</strong> ₹${pricePerT.toLocaleString()} /t</div>
+    <div style="margin-top:8px"><strong>Estimated revenue:</strong> ₹${Math.round(revenue).toLocaleString()}</div>
+    <div style="margin-top:6px"><strong>Estimated profit:</strong> ₹${Math.round(profit).toLocaleString()}</div>
+    <div style="margin-top:8px" class="small-muted">* Replace price with Agmarknet or your market API for real-time values.</div>
+    <div style="margin-top:8px"><button class="btn ghost" id="fetchMarket">Fetch market price (sim)</button></div>
+  `;
+
+  document.getElementById('fetchMarket').addEventListener('click', ()=>{
+    // Simulated fetch — replace with real Agmarknet proxy call
+    const loader = document.createElement('div'); loader.className='small-muted'; loader.textContent='Fetching...';
+    resDiv.appendChild(loader);
+    setTimeout(()=>{
+      loader.remove();
+      const priceNow = Math.round(pricePerT * (0.9 + Math.random()*0.2));
+      const revenueNow = expectedProduction_t * priceNow;
+      const profitNow = revenueNow - totalCost;
+      resDiv.insertAdjacentHTML('beforeend', `<div style="margin-top:8px"><strong>Real-time price (sim):</strong> ₹${priceNow.toLocaleString()} /t</div><div style="margin-top:6px"><strong>Revenue (real):</strong> ₹${Math.round(revenueNow).toLocaleString()}</div><div style="margin-top:6px"><strong>Profit (real):</strong> ₹${Math.round(profitNow).toLocaleString()}</div>`);
+    },1200);
+  }, {once:true});
+
+});
+
+/* =========
+   Heal your crop: simple photo check + mock diagnosis
+   - Replace the heuristics here with a real diagnosis API or TF.js model
+   ========= */
+document.getElementById('cropImage').addEventListener('change', async (ev)=>{
+  const file = ev.target.files[0];
+  if (!file) return;
+  const img = await fileToImage(file);
+  const canvas = document.createElement('canvas'); canvas.width=img.width; canvas.height=img.height;
+  const ctx = canvas.getContext('2d'); ctx.drawImage(img,0,0);
+  const data = ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  let green=0,total=0,yellow=0,brown=0;
+  for (let i=0;i<data.length;i+=4){
+    const r=data[i], g=data[i+1], b=data[i+2];
+    total++;
+    if (g>r+15 && g>b+15 && g>50) green++;
+    if (r>120 && g>80 && b<70 && (r-g)>10) yellow++;
+    if (r>100 && g>60 && b<60 && r>g) brown++;
+  }
+  const pctGreen = (green/total)*100;
+  const resultDiv = document.getElementById('healResult');
+  if (pctGreen < 12){
+    resultDiv.innerHTML = `<div style="padding:8px;border-radius:8px;background:#fff3f3;border:1px solid #ffd6d6"><strong>${tr('notCrop')}</strong><div class="small-muted">Detected ${pctGreen.toFixed(1)}% green. Upload a clear crop image (leaf/plant canopy).</div></div>`;
+    return;
+  }
+  // Mock diagnosis logic
+  const suggestions = [];
+  let diagnosis = 'Healthy';
+  if (brown/total*100 > 3) { diagnosis='Possible fungal/burn'; suggestions.push('Apply recommended fungicide'); }
+  if (yellow/total*100 > 6){ diagnosis='Possible nutrient deficiency'; suggestions.push('Soil test & NPK'); }
+  if (diagnosis==='Healthy') suggestions.push('Monitor and follow IPM best practices');
+  // render
+  resultDiv.innerHTML = `<div style="display:flex; gap:10px; align-items:flex-start;"><img src="${canvas.toDataURL()}" style="width:120px;border-radius:6px;border:1px solid #eee"/><div><strong>${tr('diagnose')}:</strong> ${diagnosis}<div style="margin-top:8px;"><strong>Recommendations:</strong><ul class="small-muted">${suggestions.map(s=>`<li>${s}</li>`).join('')}</ul></div></div></div>`;
+  // Hook: replace above heuristics with POST to /api/diagnose (multipart/form-data) and parse result.
+});
+
+/* helper to read image */
+function fileToImage(file){ return new Promise((res,rej)=>{ const r=new FileReader(); r.onload=()=>{ const img=new Image(); img.onload=()=>res(img); img.onerror=rej; img.src=r.result; }; r.onerror=rej; r.readAsDataURL(file); });}
+
+/* =========
+   UI interactions + initialization
+   ========= */
+document.getElementById('openHealBtn').addEventListener('click', ()=> openPanel('heal'));
+document.getElementById('openCostBtn').addEventListener('click', ()=> openPanel('cost'));
+
+function openPanel(name){
+  document.getElementById('healPanel').style.display = name==='heal' ? 'block' : 'none';
+  document.getElementById('costPanel').style.display = name==='cost' ? 'block' : 'none';
+}
+
+/* season buttons */
+document.querySelectorAll('.season-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.season-btn').forEach(b=>b.classList.remove('active'));
+    btn.classList.add('active');
+    renderRecommendations();
+  });
+});
+
+/* Apply filters */
+document.getElementById('applyFilters').addEventListener('click', ()=> renderRecommendations());
+document.getElementById('sortSelect').addEventListener('change', ()=> renderRecommendations());
+
+/* Insert crop list for cost panel */
+function populateCropSelect(){
+  const sel = document.getElementById('selectCrop');
+  sel.innerHTML = `<option value="">${tr('selectCrop')}</option>`;
+  cropDB.forEach(c=>{
+    const o = document.createElement('option'); o.value=c.id; o.textContent=c.name; sel.appendChild(o);
+  });
+  document.getElementById('cropDbPreview').innerHTML = cropDB.map(c=>`<div style="padding:6px 0"><strong>${c.name}</strong> <span class="small-muted">• ${c.idealTemp.join('-')}°C • ${c.idealMoisture.join('-')}% moist</span></div>`).join('');
+}
+
+/* when user chooses saved field in cost select, auto-fill acres */
+document.getElementById('selectField').addEventListener('change', (e)=>{
+  const fid = e.target.value;
+  if (!fid) return document.getElementById('inputAcres').value='';
+  const f = savedFields.find(x=>x.id===fid);
+  if (f) document.getElementById('inputAcres').value = Number(f.acres.toFixed(3));
+});
+
+/* selectCrop detail fetch (if needed) */
+document.getElementById('selectCrop').addEventListener('change', (e)=>{
+  const id = e.target.value;
+  // Optionally show quick info or populate recommended costs for that crop
+});
+
+/* on load: init small map and populate crops; render recs */
+window.addEventListener('load', ()=>{
+  initSmallMap();
+  populateCropSelect();
+  renderRecommendations();
+  applyLang();
+});
+
+/* init small map when modal opened (lazy) */
+document.getElementById('mapModal').addEventListener('transitionend', ()=>{
+  if (document.getElementById('mapModal').style.display === 'flex') initSmallMap();
+});
+
+/* initial saved fields rendering (none) */
+renderSavedFields();
+updateSavedSelect();
+updateFarmSummary();
+
+/* =========
+   Integration notes (where to plug your APIs)
+   - Weather: you said your project already has weather/temp — set document.getElementById('tempInput').value and document.getElementById('moistInput').value from your values and call renderRecommendations()
+     e.g.
+       document.getElementById('tempInput').value = liveTemp;
+       document.getElementById('moistInput').value = liveHumidity;
+       renderRecommendations();
+   - Agmarknet / Market prices: replace the simulated fetch in Cost Analysis (fetchMarket click handler) with a backend endpoint that proxies Agmarknet or other mandi APIs.
+   - Plant diagnosis: replace the image heuristic with a POST to /api/diagnose (multipart) and parse {isCrop, diagnosis, treatments[]}
+   - Soil tests: if you have soil test results, push them into the phInput and soilSelect and call renderRecommendations()
+   - Large crop DB: move cropDB to a separate JSON file (e.g. crops.json) and load it via fetch to keep file light.
+   - Persistence: POST savedFields to /api/fields and GET them on page load to persist across sessions.
+   ========= */
+
+  </script>
+</body>
+</html>

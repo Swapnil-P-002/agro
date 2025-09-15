@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Admin Dashboard</title>
+<style>
+  body {
+    margin: 0;
+    font-family: 'Segoe UI', sans-serif;
+    background: #ffffff;
+    color: #000;
+    transition: background 0.5s, color 0.5s;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+  }
+  body.dark { background: #121212; color: #eee; }
+  header { display: flex; justify-content: space-between; align-items: center; padding: 10px 20px; border-bottom: 1px solid #ccc; }
+  .datetime { font-weight: bold; }
+  .top-right { display: flex; align-items: center; }
+  .language-select, .mode-toggle { margin-left: 10px; padding: 5px 8px; cursor: pointer; border-radius: 6px; border: none; }
+  main { flex: 1; display: flex; justify-content: center; align-items: flex-start; padding-top: 20px; }
+  .dashboard-container {
+    background: rgba(255,255,255,0.95);
+    padding: 30px;
+    border-radius: 15px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
+    max-width: 800px;
+    width: 100%;
+    text-align: center;
+  }
+  body.dark .dashboard-container { background: rgba(0,0,0,0.7); }
+  .profile-section { display: flex; align-items: center; justify-content: center; margin-bottom: 20px; }
+  .profile-section img { width: 70px; height: 70px; border-radius: 50%; margin-right: 20px; object-fit: cover; cursor: pointer; }
+  .profile-details p { margin: 5px 0; text-align: left; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  th, td { border: 1px solid #aaa; padding: 8px; text-align: left; }
+  th { background-color: #ddd; }
+  body.dark th { background-color: #333; }
+  .btn { padding: 6px 12px; margin: 2px; cursor: pointer; border-radius: 6px; border: none; }
+  .btn-delete { background-color: #e53935; color: white; }
+</style>
+</head>
+<body>
+<header>
+  <div class="datetime" id="datetime"></div>
+  <div class="top-right">
+    <select class="language-select" id="language" onchange="setLanguage()">
+      <option value="en">English</option>
+      <option value="mr">Marathi</option>
+      <option value="hi">Hindi</option>
+      <option value="pa">Punjabi</option>
+    </select>
+    <button class="mode-toggle" onclick="toggleMode()">🌙</button>
+  </div>
+</header>
+
+<main>
+  <div class="dashboard-container">
+    <div class="profile-section">
+      <img src="default-profile.png" alt="Profile Image" id="profileImg" onclick="changeProfileImage()">
+      <div>
+        <h2 id="welcomeMsg">Welcome, Admin</h2>
+        <p id="roleDisplay">Role: Admin</p>
+      </div>
+    </div>
+
+    <div id="profileDetails" class="profile-details">
+      <p><strong>Name:</strong> <span id="userName"></span></p>
+    </div>
+
+    <h3>Registered Farmers</h3>
+    <table id="usersTable">
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Mobile</th>
+          <th>Email</th>
+          <th>State</th>
+          <th>City</th>
+          <th>Village</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+  </div>
+</main>
+
+<script>
+// DateTime
+function updateDateTime() {
+  const now = new Date();
+  document.getElementById("datetime").innerText = now.toLocaleDateString() + " " + now.toLocaleTimeString();
+}
+setInterval(updateDateTime, 1000);
+updateDateTime();
+
+// Dark mode toggle
+function toggleMode() { document.body.classList.toggle("dark"); }
+
+// Language translations
+const translations = {
+  en: {welcome:"Welcome", role:"Role: Admin"},
+  mr: {welcome:"स्वागत आहे", role:"भूमिका: प्रशासक"},
+  hi: {welcome:"स्वागत है", role:"भूमिका: प्रशासक"},
+  pa: {welcome:"ਸੁਆਗਤ ਹੈ", role:"ਭੂਮਿਕਾ: ਐਡਮਿਨ"}
+};
+
+function setLanguage(){
+  const lang = document.getElementById("language").value;
+  const t = translations[lang];
+  document.getElementById("welcomeMsg").innerText = t.welcome + ", Admin";
+  document.getElementById("roleDisplay").innerText = t.role;
+}
+
+// Load admin info and registered farmers
+window.onload = function(){
+  const role = localStorage.getItem("role");
+  if(role !== "admin"){ window.location.href="login.html"; return; }
+
+  // Load admin profile image if saved
+  const profileImg = localStorage.getItem("adminProfileImg");
+  if(profileImg) document.getElementById("profileImg").src = profileImg;
+
+  document.getElementById("userName").innerText = "Admin";
+
+  const users = JSON.parse(localStorage.getItem("users")) || [];
+  const tbody = document.querySelector("#usersTable tbody");
+  tbody.innerHTML = "";
+  users.forEach((u, index)=>{
+    const tr = document.createElement("tr");
+    tr.innerHTML = `<td>${u.name}</td>
+                    <td>${u.mobile}</td>
+                    <td>${u.email}</td>
+                    <td>${u.state}</td>
+                    <td>${u.city}</td>
+                    <td>${u.village}</td>
+                    <td><button class="btn btn-delete" onclick="deleteUser(${index})">Delete</button></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+// Profile image change
+function changeProfileImage(){
+  const fileInput = document.createElement("input");
+  fileInput.type="file";
+  fileInput.accept="image/*";
+  fileInput.onchange = e=>{
+    const file = e.target.files[0];
+    if(file){
+      const reader = new FileReader();
+      reader.onload = function(event){
+        document.getElementById("profileImg").src = event.target.result;
+        localStorage.setItem("adminProfileImg", event.target.result);
+      }
+      reader.readAsDataURL(file);
+    }
+  }
+  fileInput.click();
+}
+
+// Delete user
+function deleteUser(index){
+  let users = JSON.parse(localStorage.getItem("users")) || [];
+  if(confirm(`Delete user ${users[index].name}?`)){
+    users.splice(index,1);
+    localStorage.setItem("users", JSON.stringify(users));
+    location.reload();
+  }
+}
+</script>
+</body>
+</html>
